@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { getApplicationDetails, getApplicationLogs, deleteApplication, updateApplication } from '@/services/api';
 import EnvVars from '@/components/EnvVars';
 import LogsViewer from '@/components/LogsViewer';
+import { envStringToObj } from '@/components/EnvVars';
 
 type Application = {
   id: string;
@@ -120,6 +121,8 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
   if (error) return <div className="p-8 text-red-500">{error}</div>;
   if (!details) return <div className="p-8">No details found.</div>;
 
+  console.log('details', details);
+  
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-4">
@@ -179,7 +182,15 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
       </div>
       <div className="mt-8">
         <h2 className="text-xl font-semibold mb-2">Environment Variables</h2>
-        <EnvVars env={details.env || {}} onSave={handleEnvSave} loading={editLoading} />
+        <EnvVars
+          env={
+            typeof details.env === 'string'
+              ? envStringToObj(details.env)
+              : (details.env || {})
+          }
+          onSave={handleEnvSave}
+          loading={editLoading}
+        />
         {editError && <div className="text-red-500 text-sm mt-2">{editError}</div>}
         {editSuccess && <div className="text-green-600 text-sm mt-2">{editSuccess}</div>}
       </div>
