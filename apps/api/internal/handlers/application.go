@@ -31,21 +31,27 @@ import (
 )
 
 type ApplicationRequest struct {
-	Name   string            `json:"name" binding:"required,min=2,max=64"`
-	Image  string            `json:"image" binding:"required"`
-	Env    map[string]string `json:"env"`
-	Status string            `json:"status"`
-	Domain string            `json:"domain"`
-	Port   int               `json:"port"`
+	Name           string            `json:"name" binding:"required,min=2,max=64"`
+	Image          string            `json:"image" binding:"required"`
+	Env            map[string]string `json:"env"`
+	Status         string            `json:"status"`
+	Domain         string            `json:"domain"`
+	Port           int               `json:"port"`
+	GitURL         string            `json:"git_url"`
+	Branch         string            `json:"branch"`
+	DockerfilePath string            `json:"dockerfile_path"`
+	Volumes        []string          `json:"volumes"`
+	BuildArgs      map[string]string `json:"build_args"`
 }
 
 // DeployFromGitRequest is the request body for git-based deployment
 type DeployFromGitRequest struct {
-	GitURL    string            `json:"git_url" binding:"required"`
-	Branch    string            `json:"branch"`
-	Env       map[string]string `json:"env"`
-	Volumes   []string          `json:"volumes"`
-	BuildArgs map[string]string `json:"build_args"`
+	GitURL         string            `json:"git_url" binding:"required"`
+	Branch         string            `json:"branch"`
+	Env            map[string]string `json:"env"`
+	Volumes        []string          `json:"volumes"`
+	BuildArgs      map[string]string `json:"build_args"`
+	DockerfilePath string            `json:"dockerfile_path"`
 }
 
 // CreateApplication creates a new application
@@ -61,9 +67,11 @@ func CreateApplication(db *sql.DB) gin.HandlerFunc {
 		if status == "" {
 			status = "created"
 		}
+		volumesJSON, _ := json.Marshal(req.Volumes)
+		buildArgsJSON, _ := json.Marshal(req.BuildArgs)
 		result, err := db.Exec(
-			"INSERT INTO applications (name, image, env, status, created_at, domain, port) VALUES (?, ?, ?, ?, ?, ?, ?)",
-			req.Name, req.Image, string(envJSON), status, time.Now(), req.Domain, req.Port,
+			"INSERT INTO applications (name, image, env, status, created_at, domain, port, git_url, branch, dockerfile_path, volumes, build_args) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			req.Name, req.Image, string(envJSON), status, time.Now(), req.Domain, req.Port, req.GitURL, req.Branch, req.DockerfilePath, string(volumesJSON), string(buildArgsJSON),
 		)
 		if err != nil {
 			c.JSON(http.StatusConflict, gin.H{"error": "Name already exists or DB error"})
@@ -77,7 +85,7 @@ func CreateApplication(db *sql.DB) gin.HandlerFunc {
 // ListApplications returns all applications
 func ListApplications(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := db.Query("SELECT id, name, image, env, status, created_at, domain, port FROM applications ORDER BY id DESC")
+		rows, err := db.Query("SELECT id, name, image, env, status, created_at, domain, port, git_url, branch, dockerfile_path, volumes, build_args FROM applications ORDER BY id DESC")
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
 			return
@@ -86,9 +94,16 @@ func ListApplications(db *sql.DB) gin.HandlerFunc {
 		apps := []models.Application{}
 		for rows.Next() {
 			var app models.Application
-			if err := rows.Scan(&app.ID, &app.Name, &app.Image, &app.Env, &app.Status, &app.CreatedAt, &app.Domain, &app.Port); err != nil {
+			var volumesStr, buildArgsStr string
+			if err := rows.Scan(&app.ID, &app.Name, &app.Image, &app.Env, &app.Status, &app.CreatedAt, &app.Domain, &app.Port, &app.GitURL, &app.Branch, &app.DockerfilePath, &volumesStr, &buildArgsStr); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
 				return
+			}
+			if volumesStr != "" {
+				_ = json.Unmarshal([]byte(volumesStr), &app.Volumes)
+			}
+			if buildArgsStr != "" {
+				_ = json.Unmarshal([]byte(buildArgsStr), &app.BuildArgs)
 			}
 			apps = append(apps, app)
 		}
@@ -105,8 +120,9 @@ func GetApplication(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		var app models.Application
-		err = db.QueryRow("SELECT id, name, image, env, status, created_at, domain, port FROM applications WHERE id = ?", id).Scan(
-			&app.ID, &app.Name, &app.Image, &app.Env, &app.Status, &app.CreatedAt, &app.Domain, &app.Port,
+		var volumesStr, buildArgsStr string
+		err = db.QueryRow("SELECT id, name, image, env, status, created_at, domain, port, git_url, branch, dockerfile_path, volumes, build_args FROM applications WHERE id = ?", id).Scan(
+			&app.ID, &app.Name, &app.Image, &app.Env, &app.Status, &app.CreatedAt, &app.Domain, &app.Port, &app.GitURL, &app.Branch, &app.DockerfilePath, &volumesStr, &buildArgsStr,
 		)
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
@@ -114,6 +130,12 @@ func GetApplication(db *sql.DB) gin.HandlerFunc {
 		} else if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
 			return
+		}
+		if volumesStr != "" {
+			_ = json.Unmarshal([]byte(volumesStr), &app.Volumes)
+		}
+		if buildArgsStr != "" {
+			_ = json.Unmarshal([]byte(buildArgsStr), &app.BuildArgs)
 		}
 		c.JSON(http.StatusOK, app)
 	}
@@ -133,9 +155,11 @@ func UpdateApplication(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		envJSON, _ := json.Marshal(req.Env)
+		volumesJSON, _ := json.Marshal(req.Volumes)
+		buildArgsJSON, _ := json.Marshal(req.BuildArgs)
 		_, err = db.Exec(
-			"UPDATE applications SET name = ?, image = ?, env = ?, status = ?, domain = ?, port = ? WHERE id = ?",
-			req.Name, req.Image, string(envJSON), req.Status, req.Domain, req.Port, id,
+			"UPDATE applications SET name = ?, image = ?, env = ?, status = ?, domain = ?, port = ?, git_url = ?, branch = ?, dockerfile_path = ?, volumes = ?, build_args = ? WHERE id = ?",
+			req.Name, req.Image, string(envJSON), req.Status, req.Domain, req.Port, req.GitURL, req.Branch, req.DockerfilePath, string(volumesJSON), string(buildArgsJSON), id,
 		)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})

@@ -74,8 +74,14 @@ export async function deployApplicationFromGit(payload: Record<string, unknown>)
   // First, create the application and await the result
   const createRes = await createApplication({
     name: payload?.name,
-    description: payload?.description,
     image: dockerImage,
+    git_url: payload?.git_url,
+    branch: payload?.branch,
+    dockerfile_path: payload?.dockerfile_path,
+    volumes: payload?.volumes,
+    build_args: payload?.build_args,
+    domain: payload?.domain,
+    port: payload?.port,
   });
   // Extract the id from the response
   const id = createRes.id || createRes.application?.id;
@@ -89,7 +95,15 @@ export async function deployApplicationFromGit(payload: Record<string, unknown>)
       'Content-Type': 'application/json',
       Authorization: `Bearer ${getToken()}`,
     },
-    body: JSON.stringify({ repo_url: payload?.repo_url, description: payload?.description }),
+    body: JSON.stringify({
+      git_url: payload?.git_url,
+      branch: payload?.branch,
+      dockerfile_path: payload?.dockerfile_path,
+      volumes: payload?.volumes,
+      build_args: payload?.build_args,
+      domain: payload?.domain,
+      port: payload?.port,
+    }),
   });
 
   if (!res.ok) throw new Error((await res.json()).message || 'Failed to deploy application from GitHub');

@@ -22,7 +22,12 @@ func Migrate(db *sql.DB) error {
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		container_id TEXT,
 		domain TEXT,
-		port INTEGER
+		port INTEGER,
+		git_url TEXT,
+		branch TEXT,
+		dockerfile_path TEXT,
+		volumes TEXT,
+		build_args TEXT
 	);
 	`
 	_, err := db.Exec(query)

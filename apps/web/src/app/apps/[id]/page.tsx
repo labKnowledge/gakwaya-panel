@@ -18,12 +18,17 @@ const TABS = [
 type Application = {
   id: string;
   name: string;
-  repo_url?: string;
-  description?: string;
   image?: string;
   status: string;
   created_at?: string;
   env?: Record<string, string>;
+  git_url?: string;
+  branch?: string;
+  dockerfile_path?: string;
+  volumes?: string[];
+  build_args?: Record<string, string>;
+  domain?: string;
+  port?: number;
 };
 
 export default function AppDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -37,8 +42,13 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
   const [deleteError, setDeleteError] = useState('');
   const [editName, setEditName] = useState('');
   const [editImage, setEditImage] = useState('');
-  const [editRepoUrl, setEditRepoUrl] = useState('');
-  const [editDescription, setEditDescription] = useState('');
+  const [editGitUrl, setEditGitUrl] = useState('');
+  const [editBranch, setEditBranch] = useState('');
+  const [editDockerfilePath, setEditDockerfilePath] = useState('');
+  const [editVolumes, setEditVolumes] = useState<string[]>([]);
+  const [editBuildArgs, setEditBuildArgs] = useState<Record<string, string>>({});
+  const [editDomain, setEditDomain] = useState('');
+  const [editPort, setEditPort] = useState<number | ''>('');
   const [editError, setEditError] = useState('');
   const [editSuccess, setEditSuccess] = useState('');
   const [editLoading, setEditLoading] = useState(false);
@@ -91,8 +101,13 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
     if (details) {
       setEditName(details.name || '');
       setEditImage(details.image || '');
-      setEditRepoUrl(details.repo_url || '');
-      setEditDescription(details.description || '');
+      setEditGitUrl(details.git_url || '');
+      setEditBranch(details.branch || '');
+      setEditDockerfilePath(details.dockerfile_path || '');
+      setEditVolumes(details.volumes || []);
+      setEditBuildArgs(details.build_args || {});
+      setEditDomain(details.domain || '');
+      setEditPort(details.port ?? '');
     }
   }, [details]);
 
@@ -105,8 +120,13 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
       await updateApplication(id, {
         name: editName,
         image: editImage,
-        repo_url: editRepoUrl,
-        description: editDescription,
+        git_url: editGitUrl,
+        branch: editBranch,
+        dockerfile_path: editDockerfilePath,
+        volumes: editVolumes,
+        build_args: editBuildArgs,
+        domain: editDomain,
+        port: editPort === '' ? undefined : Number(editPort),
       });
       setEditSuccess('Application updated!');
       fetchDetails();
@@ -162,8 +182,13 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
       await updateApplication(id, {
         name: details.name,
         image: details.image,
-        repo_url: details.repo_url,
-        description: details.description,
+        git_url: details.git_url,
+        branch: details.branch,
+        dockerfile_path: details.dockerfile_path,
+        volumes: details.volumes,
+        build_args: details.build_args,
+        domain: details.domain,
+        port: details.port,
         env,
       });
       setEditSuccess('Environment variables updated!');
@@ -208,15 +233,18 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
       </div>
       <div className="mt-6">
         {tab === 'overview' && (
-          <div className="space-y-4">
-            <div className="flex flex-col gap-2">
-              <span className={`px-2 py-1 rounded text-xs w-fit ${details.status === 'Running' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{details.status}</span>
-              <div><span className="font-semibold">Name:</span> {details.name}</div>
-              {details.repo_url && <div><span className="font-semibold">Repo URL:</span> {details.repo_url}</div>}
-              {details.description && <div><span className="font-semibold">Description:</span> {details.description}</div>}
-              {details.image && <div><span className="font-semibold">Docker Image:</span> {details.image}</div>}
-              {details.created_at && <div><span className="font-semibold">Created At:</span> {new Date(details.created_at).toLocaleString()}</div>}
-            </div>
+          <div className="space-y-2">
+            <div><b>Name:</b> {details.name}</div>
+            <div><b>Status:</b> {details.status}</div>
+            <div><b>Image:</b> {details.image}</div>
+            <div><b>Git URL:</b> {details.git_url}</div>
+            <div><b>Branch:</b> {details.branch}</div>
+            <div><b>Dockerfile Path:</b> {details.dockerfile_path}</div>
+            <div><b>Volumes:</b> {(details.volumes||[]).join(', ')}</div>
+            <div><b>Build Args:</b> {details.build_args ? Object.entries(details.build_args).map(([k,v])=>`${k}=${v}`).join(', ') : ''}</div>
+            <div><b>Domain:</b> {details.domain}</div>
+            <div><b>Port:</b> {details.port}</div>
+            <div><span className="font-semibold">Created At:</span> {details.created_at ? new Date(details.created_at).toLocaleString() : '-'}</div>
           </div>
         )}
         {tab === 'edit' && (
@@ -232,24 +260,7 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
               />
             </div>
             <div>
-              <label className="block font-semibold mb-1">Repo URL</label>
-              <input
-                type="text"
-                className="w-full border p-2 rounded"
-                value={editRepoUrl}
-                onChange={e => setEditRepoUrl(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block font-semibold mb-1">Description</label>
-              <textarea
-                className="w-full border p-2 rounded"
-                value={editDescription}
-                onChange={e => setEditDescription(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block font-semibold mb-1">Docker Image</label>
+              <label className="block font-semibold mb-1">Image</label>
               <input
                 type="text"
                 className="w-full border p-2 rounded"
@@ -257,6 +268,41 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
                 onChange={e => setEditImage(e.target.value)}
                 required
               />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Git URL</label>
+              <input type="text" className="w-full border p-2 rounded" value={editGitUrl} onChange={e => setEditGitUrl(e.target.value)} />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Branch</label>
+              <input type="text" className="w-full border p-2 rounded" value={editBranch} onChange={e => setEditBranch(e.target.value)} />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Dockerfile Path</label>
+              <input type="text" className="w-full border p-2 rounded" value={editDockerfilePath} onChange={e => setEditDockerfilePath(e.target.value)} />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Volumes (comma separated)</label>
+              <input type="text" className="w-full border p-2 rounded" value={editVolumes.join(',')} onChange={e => setEditVolumes(e.target.value.split(',').map(v => v.trim()).filter(Boolean))} />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Build Args (key=value, one per line)</label>
+              <textarea className="w-full border p-2 rounded" value={Object.entries(editBuildArgs).map(([k,v])=>`${k}=${v}`).join('\n')} onChange={e => {
+                const obj: Record<string,string> = {};
+                e.target.value.split('\n').forEach(line => {
+                  const idx = line.indexOf('=');
+                  if (idx > 0) obj[line.slice(0,idx).trim()] = line.slice(idx+1).trim();
+                });
+                setEditBuildArgs(obj);
+              }} />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Domain</label>
+              <input type="text" className="w-full border p-2 rounded" value={editDomain} onChange={e => setEditDomain(e.target.value)} />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Port</label>
+              <input type="number" className="w-full border p-2 rounded" value={editPort} onChange={e => setEditPort(e.target.value === '' ? '' : Number(e.target.value))} />
             </div>
             {editError && <div className="text-red-500 text-sm">{editError}</div>}
             {editSuccess && <div className="text-green-600 text-sm">{editSuccess}</div>}

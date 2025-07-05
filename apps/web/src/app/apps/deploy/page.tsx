@@ -20,12 +20,19 @@ export default function DeployAppPage() {
   const [name, setName] = useState('');
   const [image, setImage] = useState('');
   const [repoUrl, setRepoUrl] = useState('');
+  const [branch, setBranch] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const [step, setStep] = useState<'method' | 'details' | 'confirm'>('method');
+  const [gitUrl, setGitUrl] = useState('');
+  const [dockerfilePath, setDockerfilePath] = useState('');
+  const [volumes, setVolumes] = useState<string[]>([]);
+  const [buildArgs, setBuildArgs] = useState<Record<string, string>>({});
+  const [domain, setDomain] = useState('');
+  const [port, setPort] = useState<number | ''>('');
 
   const handleNext = () => {
     if (step === 'method') setStep('details');
@@ -43,9 +50,27 @@ export default function DeployAppPage() {
     setLoading(true);
     try {
       if (method === 'docker') {
-        await createApplication({ name, image, description });
+        await createApplication({
+          name,
+          image,
+          git_url: gitUrl,
+          dockerfile_path: dockerfilePath,
+          volumes,
+          build_args: buildArgs,
+          domain,
+          port: port === '' ? undefined : Number(port),
+        });
       } else {
-        await deployApplicationFromGit  ({ name, repo_url: repoUrl, description });
+        await deployApplicationFromGit({
+          name,
+          git_url: gitUrl || repoUrl,
+          branch: branch || undefined,
+          dockerfile_path: dockerfilePath,
+          volumes,
+          build_args: buildArgs,
+          domain,
+          port: port === '' ? undefined : Number(port),
+        });
       }
       setSuccess('Application deployed successfully!');
       setTimeout(() => router.push('/apps'), 1200);
@@ -135,18 +160,31 @@ export default function DeployAppPage() {
                 </div>
               )}
               {method === 'git' && (
-                <div>
-                  <label className="block font-semibold mb-1 text-gray-800">GitHub Repository URL <span className="text-red-500">*</span></label>
-                  <input
-                    type="url"
-                    placeholder="https://github.com/username/repo.git"
-                    className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                    value={repoUrl}
-                    onChange={e => setRepoUrl(e.target.value)}
-                    required={method === 'git'}
-                  />
-                  <p className="text-xs text-gray-400 mt-1">Paste the full HTTPS URL of your public or private GitHub repository.</p>
-                </div>
+                <>
+                  <div>
+                    <label className="block font-semibold mb-1 text-gray-800">GitHub Repository URL <span className="text-red-500">*</span></label>
+                    <input
+                      type="url"
+                      placeholder="https://github.com/username/repo.git"
+                      className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                      value={repoUrl}
+                      onChange={e => setRepoUrl(e.target.value)}
+                      required={method === 'git'}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Paste the full HTTPS URL of your public or private GitHub repository.</p>
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-1 text-gray-800">Branch Name <span className="text-gray-400">(optional)</span></label>
+                    <input
+                      type="text"
+                      placeholder="e.g. main"
+                      className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                      value={branch}
+                      onChange={e => setBranch(e.target.value)}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Specify the branch to deploy (default is usually &#39;main&#39;).</p>
+                  </div>
+                </>
               )}
               <div>
                 <label className="block font-semibold mb-1 text-gray-800">Description</label>
@@ -156,6 +194,37 @@ export default function DeployAppPage() {
                   value={description}
                   onChange={e => setDescription(e.target.value)}
                 />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1 text-gray-800">Git URL</label>
+                <input type="text" className="w-full border border-gray-300 p-3 rounded-lg" value={gitUrl} onChange={e => setGitUrl(e.target.value)} />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1 text-gray-800">Dockerfile Path</label>
+                <input type="text" className="w-full border border-gray-300 p-3 rounded-lg" value={dockerfilePath} onChange={e => setDockerfilePath(e.target.value)} />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1 text-gray-800">Volumes (comma separated)</label>
+                <input type="text" className="w-full border border-gray-300 p-3 rounded-lg" value={volumes.join(',')} onChange={e => setVolumes(e.target.value.split(',').map(v => v.trim()).filter(Boolean))} />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1 text-gray-800">Build Args (key=value, one per line)</label>
+                <textarea className="w-full border border-gray-300 p-3 rounded-lg" value={Object.entries(buildArgs).map(([k,v])=>`${k}=${v}`).join('\n')} onChange={e => {
+                  const obj: Record<string,string> = {};
+                  e.target.value.split('\n').forEach(line => {
+                    const idx = line.indexOf('=');
+                    if (idx > 0) obj[line.slice(0,idx).trim()] = line.slice(idx+1).trim();
+                  });
+                  setBuildArgs(obj);
+                }} />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1 text-gray-800">Domain</label>
+                <input type="text" className="w-full border border-gray-300 p-3 rounded-lg" value={domain} onChange={e => setDomain(e.target.value)} />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1 text-gray-800">Port</label>
+                <input type="number" className="w-full border border-gray-300 p-3 rounded-lg" value={port} onChange={e => setPort(e.target.value === '' ? '' : Number(e.target.value))} />
               </div>
               <div className="flex gap-4 mt-8">
                 <button
@@ -183,8 +252,13 @@ export default function DeployAppPage() {
                 <div className="mb-2"><span className="font-semibold">Name:</span> {name}</div>
                 <div className="mb-2"><span className="font-semibold">Method:</span> {method === 'docker' ? 'Docker Image' : 'GitHub Repository'}</div>
                 {method === 'docker' && <div className="mb-2"><span className="font-semibold">Docker Image:</span> {image}</div>}
-                {method === 'git' && <div className="mb-2"><span className="font-semibold">Repo URL:</span> {repoUrl}</div>}
-                {description && <div className="mb-2"><span className="font-semibold">Description:</span> {description}</div>}
+                {method === 'git' && <div className="mb-2"><span className="font-semibold">Git URL:</span> {gitUrl || repoUrl}</div>}
+                <div className="mb-2"><span className="font-semibold">Branch:</span> {branch}</div>
+                <div className="mb-2"><span className="font-semibold">Dockerfile Path:</span> {dockerfilePath}</div>
+                <div className="mb-2"><span className="font-semibold">Volumes:</span> {volumes.join(', ')}</div>
+                <div className="mb-2"><span className="font-semibold">Build Args:</span> {Object.entries(buildArgs).map(([k,v])=>`${k}=${v}`).join(', ')}</div>
+                <div className="mb-2"><span className="font-semibold">Domain:</span> {domain}</div>
+                <div className="mb-2"><span className="font-semibold">Port:</span> {port}</div>
               </div>
               {error && <div className="text-red-500 text-sm font-semibold">{error}</div>}
               {success && <div className="text-green-600 text-sm font-semibold">{success}</div>}
