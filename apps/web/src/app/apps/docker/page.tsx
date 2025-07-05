@@ -41,6 +41,7 @@ export default function DockerManagementPage() {
   const [showInspect, setShowInspect] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState<string | null>(null);
   const [detailsData, setDetailsData] = useState<DockerContainer | null>(null);
+  const [showTerminal, setShowTerminal] = useState<string | null>(null);
 
   const fetchContainers = async () => {
     setLoading(true);
@@ -197,9 +198,15 @@ export default function DockerManagementPage() {
               </button>
               <button
                 className="group bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3 py-1 rounded-lg font-semibold flex items-center gap-1 text-xs transition disabled:opacity-50"
-                disabled={actionLoading === c.Id + "remove"}
-                onClick={e => { e.stopPropagation(); handleAction(c.Id, "remove"); }}
-                title="Delete Container"
+                disabled={actionLoading === c.Id + "remove" || c.State === "running"}
+                onClick={e => {
+                  e.stopPropagation();
+                  if (c.State !== "exited") return;
+                  if (window.confirm("Are you sure you want to delete this container? This action cannot be undone.")) {
+                    handleAction(c.Id, "remove");
+                  }
+                }}
+                title={c.State === "running" ? "Stop the container before deleting." : "Delete Container"}
               >
                 <TrashIcon className="w-4 h-4 group-hover:scale-110 transition" />
                 {actionLoading === c.Id + "remove" ? "Deleting..." : "Delete"}
@@ -233,7 +240,7 @@ export default function DockerManagementPage() {
           </div>
         ))}
       </div>
-      {actionError && <div className="text-red-500 mt-4">{actionError}</div>}
+      {actionError && <div className="text-red-500 mt-4">{actionError.includes('stopped') ? 'You must stop the container before deleting.' : actionError}</div>}
       {/* Details Modal */}
       {showDetails && detailsData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 transition-all">
@@ -347,7 +354,7 @@ export default function DockerManagementPage() {
               {/* Terminal endpoint button (if available) */}
               <button
                 className="group bg-black hover:bg-gray-900 text-white border border-gray-800 px-4 py-2 rounded-lg font-semibold flex items-center gap-2 text-sm transition"
-                onClick={() => window.open(`/api/docker/terminal/${detailsData.Id}`, '_blank')}
+                onClick={() => setShowTerminal(detailsData.Id)}
                 title="Open Terminal"
               >
                 <CommandLineIcon className="w-5 h-5 group-hover:scale-110 transition" />
@@ -400,6 +407,28 @@ export default function DockerManagementPage() {
                 ? inspect[showInspect]
                 : JSON.stringify(inspect[showInspect], null, 2)}
             </pre>
+          </div>
+        </div>
+      )}
+      {showTerminal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 transition-all">
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-3xl w-full mx-4 p-6 flex flex-col">
+            <button
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 transition"
+              onClick={() => setShowTerminal(null)}
+              aria-label="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <h2 className="text-lg font-bold mb-4 text-gray-800 flex items-center gap-2">
+              <CommandLineIcon className="w-5 h-5 text-black" /> Terminal
+            </h2>
+            {/* TODO: Integrate xterm.js and WebSocket connection to `/api/docker/terminal/${showTerminal}` with JWT token */}
+            <div className="bg-gray-900 text-green-200 rounded-lg p-4 min-h-[300px] flex items-center justify-center">
+              <span className="text-gray-400">Terminal UI coming soon...</span>
+            </div>
           </div>
         </div>
       )}
