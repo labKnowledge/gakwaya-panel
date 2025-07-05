@@ -9,6 +9,7 @@ export default function Sidebar() {
         <Link href="/dashboard" className="hover:text-gray-300">Dashboard</Link>
         <Link href="/apps" className="hover:text-gray-300">Applications</Link>
         <Link href="/apps/deploy" className="hover:text-gray-300">Deploy Application</Link>
+        <Link href="/apps/docker" className="hover:text-gray-300">Docker Management</Link>
       </nav>
     </aside>
   );

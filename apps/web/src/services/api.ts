@@ -84,4 +84,56 @@ export async function updateApplication(id: string, payload: Record<string, unkn
   return res.json();
 }
 
+// Docker Management API
+export async function getDockerContainers() {
+  const res = await fetch(`${API_URL}/docker/containers`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error((await res.json()).message || 'Failed to fetch containers');
+  return res.json();
+}
+
+export async function stopDockerContainer(id: string) {
+  const res = await fetch(`${API_URL}/docker/stop/${id}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error((await res.json()).message || 'Failed to stop container');
+  return res.json();
+}
+
+export async function removeDockerContainer(id: string) {
+  const res = await fetch(`${API_URL}/docker/remove/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error((await res.json()).message || 'Failed to remove container');
+  return res.json();
+}
+
+export async function restartDockerContainer(id: string) {
+  const res = await fetch(`${API_URL}/docker/restart/${id}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error((await res.json()).message || 'Failed to restart container');
+  return res.json();
+}
+
+export async function getDockerLogs(id: string) {
+  const res = await fetch(`${API_URL}/docker/logs/${id}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error((await res.json()).message || 'Failed to fetch logs');
+  return res.text();
+}
+
+export async function inspectDockerContainer(id: string) {
+  const res = await fetch(`${API_URL}/docker/inspect/${id}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error((await res.json()).message || 'Failed to inspect container');
+  return res.json();
+}
+
 // Add more API functions as needed 
