@@ -35,6 +35,8 @@ type ApplicationRequest struct {
 	Image  string            `json:"image" binding:"required"`
 	Env    map[string]string `json:"env"`
 	Status string            `json:"status"`
+	Domain string            `json:"domain"`
+	Port   int               `json:"port"`
 }
 
 // DeployFromGitRequest is the request body for git-based deployment
@@ -60,8 +62,8 @@ func CreateApplication(db *sql.DB) gin.HandlerFunc {
 			status = "created"
 		}
 		result, err := db.Exec(
-			"INSERT INTO applications (name, image, env, status, created_at) VALUES (?, ?, ?, ?, ?)",
-			req.Name, req.Image, string(envJSON), status, time.Now(),
+			"INSERT INTO applications (name, image, env, status, created_at, domain, port) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			req.Name, req.Image, string(envJSON), status, time.Now(), req.Domain, req.Port,
 		)
 		if err != nil {
 			c.JSON(http.StatusConflict, gin.H{"error": "Name already exists or DB error"})
@@ -75,7 +77,7 @@ func CreateApplication(db *sql.DB) gin.HandlerFunc {
 // ListApplications returns all applications
 func ListApplications(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := db.Query("SELECT id, name, image, env, status, created_at FROM applications ORDER BY id DESC")
+		rows, err := db.Query("SELECT id, name, image, env, status, created_at, domain, port FROM applications ORDER BY id DESC")
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
 			return
@@ -84,7 +86,7 @@ func ListApplications(db *sql.DB) gin.HandlerFunc {
 		apps := []models.Application{}
 		for rows.Next() {
 			var app models.Application
-			if err := rows.Scan(&app.ID, &app.Name, &app.Image, &app.Env, &app.Status, &app.CreatedAt); err != nil {
+			if err := rows.Scan(&app.ID, &app.Name, &app.Image, &app.Env, &app.Status, &app.CreatedAt, &app.Domain, &app.Port); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
 				return
 			}
@@ -103,8 +105,8 @@ func GetApplication(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		var app models.Application
-		err = db.QueryRow("SELECT id, name, image, env, status, created_at FROM applications WHERE id = ?", id).Scan(
-			&app.ID, &app.Name, &app.Image, &app.Env, &app.Status, &app.CreatedAt,
+		err = db.QueryRow("SELECT id, name, image, env, status, created_at, domain, port FROM applications WHERE id = ?", id).Scan(
+			&app.ID, &app.Name, &app.Image, &app.Env, &app.Status, &app.CreatedAt, &app.Domain, &app.Port,
 		)
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
@@ -132,8 +134,8 @@ func UpdateApplication(db *sql.DB) gin.HandlerFunc {
 		}
 		envJSON, _ := json.Marshal(req.Env)
 		_, err = db.Exec(
-			"UPDATE applications SET name = ?, image = ?, env = ?, status = ? WHERE id = ?",
-			req.Name, req.Image, string(envJSON), req.Status, id,
+			"UPDATE applications SET name = ?, image = ?, env = ?, status = ?, domain = ?, port = ? WHERE id = ?",
+			req.Name, req.Image, string(envJSON), req.Status, req.Domain, req.Port, id,
 		)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})

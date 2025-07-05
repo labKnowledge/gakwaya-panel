@@ -13,4 +13,6 @@ type Application struct {
 	Status      string    `db:"status" json:"status"`
 	CreatedAt   time.Time `db:"created_at" json:"created_at"`
 	ContainerID string    `db:"container_id" json:"container_id"`
+	Domain      string    `db:"domain" json:"domain"`
+	Port        int       `db:"port" json:"port"`
 }

@@ -20,7 +20,9 @@ func Migrate(db *sql.DB) error {
 		env TEXT,
 		status TEXT NOT NULL DEFAULT 'created',
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		container_id TEXT
+		container_id TEXT,
+		domain TEXT,
+		port INTEGER
 	);
 	`
 	_, err := db.Exec(query)
