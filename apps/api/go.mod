@@ -12,7 +12,6 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.28
-	github.com/rs/cors/wrapper/gin v0.0.0-20240830163046-1084d89a1692
 	golang.org/x/crypto v0.39.0
 )
 
@@ -54,7 +53,6 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pjbgf/sha1cd v0.3.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rs/cors v1.11.0 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect

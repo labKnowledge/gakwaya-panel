@@ -1,0 +1,14 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="256" height="256" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#bgGradient)"/>
+  <circle cx="128" cy="128" r="80" fill="#fff" filter="url(#shadow)"/>
+  <text x="50%" y="56%" text-anchor="middle" fill="#0ea5e9" font-family="'Segoe UI', Arial, Helvetica, sans-serif" font-size="88" font-weight="bold" dy=".35em" letter-spacing="-4">GP</text>
+</svg> 

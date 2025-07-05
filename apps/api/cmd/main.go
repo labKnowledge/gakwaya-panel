@@ -11,24 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
-
 	// cors "github.com/rs/cors/wrapper/gin"
-	"strings"
 )
-
-func CORSMiddleware_v2() gin.HandlerFunc {
-	return func(c *gin.Context) {
-
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Headers", "*")
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-
-		c.Next()
-	}
-}
 
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -42,51 +26,6 @@ func CORSMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		c.Next()
-	}
-}
-
-// CORS middleware function definition
-func CORSMiddleware_v3() gin.HandlerFunc {
-	// Define allowed origins as a comma-separated string
-	originsString := "https://glowing-sniffle-j45p766p7w52q565-8080.app.github.dev,https://glowing-sniffle-j45p766p7w52q565-3000.app.github.dev,http://localhost:3000,http://localhost:8080"
-	var allowedOrigins []string
-	if originsString != "" {
-		// Split the originsString into individual origins and store them in allowedOrigins slice
-		allowedOrigins = strings.Split(originsString, ",")
-	}
-
-	// Return the actual middleware handler function
-	return func(c *gin.Context) {
-		// Function to check if a given origin is allowed
-		isOriginAllowed := func(origin string, allowedOrigins []string) bool {
-			for _, allowedOrigin := range allowedOrigins {
-				if origin == allowedOrigin {
-					return true
-				}
-			}
-			return false
-		}
-
-		// Get the Origin header from the request
-		origin := c.Request.Header.Get("Origin")
-
-		// Check if the origin is allowed
-		if isOriginAllowed(origin, allowedOrigins) {
-			// If the origin is allowed, set CORS headers in the response
-			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-			c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-			c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT")
-		}
-
-		// Handle preflight OPTIONS requests by aborting with status 204
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-
-		// Call the next handler
 		c.Next()
 	}
 }
@@ -138,19 +77,7 @@ func main() {
 	}
 
 	r := gin.Default()
-	// r.Use(CORSMiddleware_v3())
-	// r.Use(func(c *gin.Context) {
-	// 	c.Header("Access-Control-Allow-Origin", "*")
-	// 	c.Header("Access-Control-Allow-Methods", "*")
-	// 	c.Header("Access-Control-Allow-Headers", "*")
-
-	// 	if c.Request.Method == "OPTIONS" {
-	// 		c.AbortWithStatus(204)
-	// 		return
-	// 	}
-
-	// 	c.Next()
-	// })
+	r.Use(CORSMiddleware())
 
 	// Health check endpoint
 	r.GET("/healthz", func(c *gin.Context) {
