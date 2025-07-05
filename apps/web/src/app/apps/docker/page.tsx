@@ -7,8 +7,11 @@ import {
   restartDockerContainer,
   getDockerLogs,
   inspectDockerContainer,
+  dockerPrune,
+  dockerPruneAll,
 } from '@/services/api';
 import { InformationCircleIcon, TrashIcon, StopIcon, ArrowPathIcon, DocumentMagnifyingGlassIcon, CommandLineIcon } from '@heroicons/react/24/outline';
+import Swal from 'sweetalert2';
 
 type DockerContainer = {
   Id: string;
@@ -42,6 +45,9 @@ export default function DockerManagementPage() {
   const [showDetails, setShowDetails] = useState<string | null>(null);
   const [detailsData, setDetailsData] = useState<DockerContainer | null>(null);
   const [showTerminal, setShowTerminal] = useState<string | null>(null);
+  const [pruneLoading, setPruneLoading] = useState<'prune' | 'pruneAll' | null>(null);
+  const [pruneResult, setPruneResult] = useState<string | null>(null);
+  const [pruneError, setPruneError] = useState<string | null>(null);
 
   const fetchContainers = async () => {
     setLoading(true);
@@ -143,6 +149,71 @@ export default function DockerManagementPage() {
           Docker Containers
         </h2>
       </div>
+      <div className="flex flex-col md:flex-row gap-4 mb-8">
+        <button
+          className="bg-orange-100 hover:bg-orange-200 text-orange-800 border border-orange-300 px-5 py-2 rounded-lg font-semibold flex items-center gap-2 text-sm transition disabled:opacity-50"
+          disabled={pruneLoading === 'prune'}
+          onClick={async () => {
+            const result = await Swal.fire({
+              title: 'Prune Unused Data',
+              text: 'This will remove unused Docker data (dangling images, stopped containers, etc.). Are you sure?',
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonText: 'Yes, prune',
+              cancelButtonText: 'Cancel',
+            });
+            if (!result.isConfirmed) return;
+            setPruneLoading('prune'); setPruneResult(null); setPruneError(null);
+            try {
+              const res = await dockerPrune();
+              setPruneResult(res.details || 'Prune completed.');
+              await fetchContainers();
+              await Swal.fire('Pruned!', 'Unused Docker data has been removed.', 'success');
+            } catch (err) {
+              setPruneError(err instanceof Error ? err.message : 'Prune failed');
+              await Swal.fire('Error', err instanceof Error ? err.message : 'Prune failed', 'error');
+            } finally {
+              setPruneLoading(null);
+            }
+          }}
+          title="Remove unused Docker data (safe)"
+        >
+          {pruneLoading === 'prune' ? 'Pruning...' : 'Prune Unused Data'}
+        </button>
+        <button
+          className="bg-red-100 hover:bg-red-200 text-red-800 border border-red-300 px-5 py-2 rounded-lg font-semibold flex items-center gap-2 text-sm transition disabled:opacity-50"
+          disabled={pruneLoading === 'pruneAll'}
+          onClick={async () => {
+            const result = await Swal.fire({
+              title: 'Prune All (Dangerous)',
+              html: '<b>WARNING:</b> This will aggressively remove <b>ALL</b> unused Docker data, including volumes and networks. This is destructive and cannot be undone. Are you absolutely sure?',
+              icon: 'error',
+              showCancelButton: true,
+              confirmButtonText: 'Yes, prune all',
+              cancelButtonText: 'Cancel',
+              focusCancel: true,
+            });
+            if (!result.isConfirmed) return;
+            setPruneLoading('pruneAll'); setPruneResult(null); setPruneError(null);
+            try {
+              const res = await dockerPruneAll();
+              setPruneResult(res.details || 'Prune All completed.');
+              await fetchContainers();
+              await Swal.fire('Pruned All!', 'All unused Docker data has been removed.', 'success');
+            } catch (err) {
+              setPruneError(err instanceof Error ? err.message : 'Prune All failed');
+              await Swal.fire('Error', err instanceof Error ? err.message : 'Prune All failed', 'error');
+            } finally {
+              setPruneLoading(null);
+            }
+          }}
+          title="Aggressively remove all unused Docker data (dangerous)"
+        >
+          {pruneLoading === 'pruneAll' ? 'Pruning All...' : 'Prune All (Dangerous)'}
+        </button>
+      </div>
+      {pruneResult && <div className="bg-green-50 text-green-800 border border-green-200 rounded-lg px-4 py-2 mb-4">{pruneResult}</div>}
+      {pruneError && <div className="bg-red-50 text-red-800 border border-red-200 rounded-lg px-4 py-2 mb-4">{pruneError}</div>}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {containers.map((c) => (
           <div

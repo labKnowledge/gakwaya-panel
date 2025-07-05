@@ -136,4 +136,22 @@ export async function inspectDockerContainer(id: string) {
   return res.json();
 }
 
+export async function dockerPrune() {
+  const res = await fetch(`${API_URL}/docker/prune`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error((await res.json()).message || 'Failed to prune Docker system');
+  return res.json();
+}
+
+export async function dockerPruneAll() {
+  const res = await fetch(`${API_URL}/docker/prune-all`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error((await res.json()).message || 'Failed to prune all Docker data');
+  return res.json();
+}
+
 // Add more API functions as needed 
