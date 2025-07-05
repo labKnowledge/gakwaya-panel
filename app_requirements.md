@@ -1,4 +1,4 @@
-# GakwayaPanel - Project Requirements & Technical Specification
+# Gakwaya-panel - Project Requirements & Technical Specification
 
 ## 📋 Project Overview
 
