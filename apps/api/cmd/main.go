@@ -88,6 +88,11 @@ func main() {
 	r := gin.Default()
 	r.Use(CORSMiddleware())
 
+	r.OPTIONS("/*path", func(c *gin.Context) {
+		log.Println("CORS preflight request handled")
+		c.AbortWithStatus(204)
+	})
+
 	// Health check endpoint
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
