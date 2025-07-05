@@ -19,7 +19,6 @@ export default function DeployAppPage() {
   const [method, setMethod] = useState<'docker' | 'git'>('docker');
   const [name, setName] = useState('');
   const [image, setImage] = useState('');
-  const [repoUrl, setRepoUrl] = useState('');
   const [branch, setBranch] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
@@ -63,7 +62,7 @@ export default function DeployAppPage() {
       } else {
         await deployApplicationFromGit({
           name,
-          git_url: gitUrl || repoUrl,
+          git_url: gitUrl ,
           branch: branch || undefined,
           dockerfile_path: dockerfilePath,
           volumes,
@@ -167,8 +166,8 @@ export default function DeployAppPage() {
                       type="url"
                       placeholder="https://github.com/username/repo.git"
                       className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                      value={repoUrl}
-                      onChange={e => setRepoUrl(e.target.value)}
+                      value={gitUrl}
+                      onChange={e => setGitUrl(e.target.value)}
                       required={method === 'git'}
                     />
                     <p className="text-xs text-gray-400 mt-1">Paste the full HTTPS URL of your public or private GitHub repository.</p>
@@ -194,10 +193,6 @@ export default function DeployAppPage() {
                   value={description}
                   onChange={e => setDescription(e.target.value)}
                 />
-              </div>
-              <div>
-                <label className="block font-semibold mb-1 text-gray-800">Git URL</label>
-                <input type="text" className="w-full border border-gray-300 p-3 rounded-lg" value={gitUrl} onChange={e => setGitUrl(e.target.value)} />
               </div>
               <div>
                 <label className="block font-semibold mb-1 text-gray-800">Dockerfile Path</label>
@@ -237,7 +232,7 @@ export default function DeployAppPage() {
                 <button
                   type="submit"
                   className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold text-lg shadow transition"
-                  disabled={!name || (method === 'docker' && !image) || (method === 'git' && !repoUrl)}
+                  disabled={!name || (method === 'docker' && !image) || (method === 'git' && !gitUrl)}
                 >
                   Next
                 </button>
@@ -252,7 +247,7 @@ export default function DeployAppPage() {
                 <div className="mb-2"><span className="font-semibold">Name:</span> {name}</div>
                 <div className="mb-2"><span className="font-semibold">Method:</span> {method === 'docker' ? 'Docker Image' : 'GitHub Repository'}</div>
                 {method === 'docker' && <div className="mb-2"><span className="font-semibold">Docker Image:</span> {image}</div>}
-                {method === 'git' && <div className="mb-2"><span className="font-semibold">Git URL:</span> {gitUrl || repoUrl}</div>}
+                {method === 'git' && <div className="mb-2"><span className="font-semibold">Git URL:</span> {gitUrl}</div>}
                 <div className="mb-2"><span className="font-semibold">Branch:</span> {branch}</div>
                 <div className="mb-2"><span className="font-semibold">Dockerfile Path:</span> {dockerfilePath}</div>
                 <div className="mb-2"><span className="font-semibold">Volumes:</span> {volumes.join(', ')}</div>
@@ -306,7 +301,7 @@ export default function DeployAppPage() {
               {method === 'git' && (
                 <div>
                   <span className="block text-xs text-gray-400 font-semibold mb-1">Repo URL</span>
-                  <span className="text-lg text-blue-900">{repoUrl || <span className="text-gray-400">Not set</span>}</span>
+                  <span className="text-lg text-blue-900">{gitUrl || <span className="text-gray-400">Not set</span>}</span>
                 </div>
               )}
               <div>
