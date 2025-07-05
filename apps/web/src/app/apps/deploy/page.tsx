@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createApplication } from '@/services/api';
+import { createApplication, deployApplicationFromGit } from '@/services/api';
 import { FaDocker, FaGithub } from 'react-icons/fa';
 
 const DEPLOY_METHODS = [
@@ -45,7 +45,7 @@ export default function DeployAppPage() {
       if (method === 'docker') {
         await createApplication({ name, image, description });
       } else {
-        await createApplication({ name, repo_url: repoUrl, description });
+        await deployApplicationFromGit  ({ name, repo_url: repoUrl, description });
       }
       setSuccess('Application deployed successfully!');
       setTimeout(() => router.push('/apps'), 1200);

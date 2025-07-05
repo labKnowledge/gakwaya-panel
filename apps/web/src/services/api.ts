@@ -62,6 +62,40 @@ export async function createApplication(payload: Record<string, unknown>) {
   return res.json();
 }
 
+export async function deployApplicationFromGit(payload: Record<string, unknown>) {
+  // Sanitize app name for docker image tag
+  const rawName = (payload?.name || '').toString();
+  const timestamp = Date.now();
+  const dockerImage = rawName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') + `_${timestamp}`;
+
+  // First, create the application and await the result
+  const createRes = await createApplication({
+    name: payload?.name,
+    description: payload?.description,
+    image: dockerImage,
+  });
+  // Extract the id from the response
+  const id = createRes.id || createRes.application?.id;
+  
+  if (!id) throw new Error('Failed to get application ID after creation');
+
+  // Now, deploy from git using the obtained id
+  const res = await fetch(`${API_URL}/applications/${id}/deploy-from-git`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`,
+    },
+    body: JSON.stringify({ repo_url: payload?.repo_url, description: payload?.description }),
+  });
+
+  if (!res.ok) throw new Error((await res.json()).message || 'Failed to deploy application from GitHub');
+  return res.json();
+}
+
 export async function deleteApplication(id: string) {
   const res = await fetch(`${API_URL}/applications/${id}`, {
     method: 'DELETE',
