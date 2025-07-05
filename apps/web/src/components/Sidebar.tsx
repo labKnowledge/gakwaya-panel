@@ -47,7 +47,7 @@ export default function Sidebar() {
                 className={
                   (isDeployActive
                     ? "bg-indigo-100 text-indigo-900 font-semibold border-l-4 border-indigo-500 "
-                    : "hover:bg-indigo-50 text-white-700 ") +
+                    : "hover:bg-indigo-50 hover:text-gray-700  text-white-700 ") +
                   "rounded px-3 py-2 transition-all duration-150"
                 }
                 aria-current={isDeployActive ? "page" : undefined}
@@ -59,7 +59,7 @@ export default function Sidebar() {
                 className={
                   (isDockerActive
                     ? "bg-indigo-100 text-indigo-900 font-semibold border-l-4 border-indigo-500 "
-                    : "hover:bg-indigo-50 text-white  -700 ") +
+                    : "hover:bg-indigo-50  hover:text-gray-700 text-white-700 ") +
                   "rounded px-3 py-2 transition-all duration-150"
                 }
                 aria-current={isDockerActive ? "page" : undefined}
