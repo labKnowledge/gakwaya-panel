@@ -11,7 +11,7 @@ export default function Sidebar() {
 
   return (
     <aside className="h-screen w-64 bg-gray-900 text-white flex flex-col p-4">
-      <div className="font-bold text-xl mb-8">GakwayaPanel</div>
+      <div className="font-bold text-xl mb-8">Actions</div>
       <nav className="flex flex-col gap-2">
         <Link
           href="/dashboard"

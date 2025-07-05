@@ -68,7 +68,6 @@ export default function AppList() {
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">Applications</h2>
         <Link href="/apps/deploy" className="bg-blue-600 text-white px-4 py-2 rounded font-semibold">Create Application</Link>
       </div>
       <div className="overflow-x-auto">
