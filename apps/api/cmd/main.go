@@ -79,6 +79,10 @@ func main() {
 	if err := runMigrations(db); err != nil {
 		log.Fatalf("Migration failed: %v", err)
 	}
+	// Add container_port column if not present
+	if err := models.AddContainerPortColumn(db); err != nil {
+		log.Printf("[WARN] Could not add container_port column: %v", err)
+	}
 
 	// Simple ping to check DB connection
 	if err := db.Ping(); err != nil {
@@ -138,9 +142,10 @@ func main() {
 		dockerGroup.GET("/stats/:id", handlers.StatsDockerContainer())
 		dockerGroup.POST("/exec/:id", handlers.ExecDockerContainer())
 		dockerGroup.GET("/terminal/:id", handlers.TerminalDockerContainer())
+		dockerGroup.GET("/exposed-ports", handlers.GetExposedPorts())
 	}
 
-	log.Printf("Starting server on :%s", port)
+	log.Printf("\n\n\n\n----\n\n Starting server on :%s\n\n---\n\n\n\n\n\n\n", port)
 	r.Run(":" + port)
 }
 

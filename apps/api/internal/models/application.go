@@ -14,7 +14,8 @@ type Application struct {
 	CreatedAt      time.Time         `db:"created_at" json:"created_at"`
 	ContainerID    string            `db:"container_id" json:"container_id"`
 	Domain         string            `db:"domain" json:"domain"`
-	Port           int               `db:"port" json:"port"`
+	Port           int               `db:"port" json:"host_port"`
+	ContainerPort  int               `db:"container_port" json:"container_port"`
 	GitURL         string            `db:"git_url" json:"git_url,omitempty"`                 // Optional: Git repository URL
 	Branch         string            `db:"branch" json:"branch,omitempty"`                   // Optional: Git branch name
 	DockerfilePath string            `db:"dockerfile_path" json:"dockerfile_path,omitempty"` // Optional: Path to Dockerfile

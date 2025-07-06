@@ -62,6 +62,34 @@ export async function createApplication(payload: Record<string, unknown>) {
   return res.json();
 }
 
+export async function deployApplication(payload: Record<string, unknown>) {
+  const res = await fetch(`${API_URL}/applications/${payload.id}/deploy`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error((await res.json()).message || 'Failed to deploy application');
+  return res.json();
+}
+
+export async function handleExposedPorts(payload: Record<string, unknown>) {
+  let url = '';
+  if (payload.container_id) {
+    url = `${API_URL}/docker/exposed-ports?container_id=${payload.container_id}`;
+  } else if (payload.image) {
+    url = `${API_URL}/docker/exposed-ports?image=${payload.image}`;
+  }
+  if (!url) throw new Error('No container_id or image provided');
+  
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error((await res.json()).message || 'Failed to handle exposed ports');
+  return res.json();
+} 
+
+
+
 export async function deployApplicationFromGit(payload: Record<string, unknown>) {
   // Sanitize app name for docker image tag
   const rawName = (payload?.name || '').toString();
@@ -81,7 +109,8 @@ export async function deployApplicationFromGit(payload: Record<string, unknown>)
     volumes: payload?.volumes,
     build_args: payload?.build_args,
     domain: payload?.domain,
-    port: payload?.port,
+    host_port: payload?.host_port,
+    container_port: payload?.container_port,
   });
   // Extract the id from the response
   const id = createRes.id || createRes.application?.id;
@@ -102,7 +131,8 @@ export async function deployApplicationFromGit(payload: Record<string, unknown>)
       volumes: payload?.volumes,
       build_args: payload?.build_args,
       domain: payload?.domain,
-      port: payload?.port,
+      host_port: payload?.host_port,
+      container_port: payload?.container_port,
     }),
   });
 

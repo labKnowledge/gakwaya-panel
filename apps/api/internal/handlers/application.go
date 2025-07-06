@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -23,6 +24,7 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 	"github.com/gakwaya-panel/api/internal/dockerutil"
 	"github.com/gakwaya-panel/api/internal/models"
 	"github.com/gin-gonic/gin"
@@ -36,7 +38,8 @@ type ApplicationRequest struct {
 	Env            map[string]string `json:"env"`
 	Status         string            `json:"status"`
 	Domain         string            `json:"domain"`
-	Port           int               `json:"port"`
+	Port           int               `json:"host_port"`
+	ContainerPort  int               `json:"container_port"`
 	GitURL         string            `json:"git_url"`
 	Branch         string            `json:"branch"`
 	DockerfilePath string            `json:"dockerfile_path"`
@@ -70,11 +73,12 @@ func CreateApplication(db *sql.DB) gin.HandlerFunc {
 		volumesJSON, _ := json.Marshal(req.Volumes)
 		buildArgsJSON, _ := json.Marshal(req.BuildArgs)
 		result, err := db.Exec(
-			"INSERT INTO applications (name, image, env, status, created_at, domain, port, git_url, branch, dockerfile_path, volumes, build_args) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-			req.Name, req.Image, string(envJSON), status, time.Now(), req.Domain, req.Port, req.GitURL, req.Branch, req.DockerfilePath, string(volumesJSON), string(buildArgsJSON),
+			"INSERT INTO applications (name, image, env, status, created_at, domain, host_port, container_port, git_url, branch, dockerfile_path, volumes, build_args) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			req.Name, req.Image, string(envJSON), status, time.Now(), req.Domain, req.Port, req.ContainerPort, req.GitURL, req.Branch, req.DockerfilePath, string(volumesJSON), string(buildArgsJSON),
 		)
 		if err != nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "Name already exists or DB error"})
+			log.Println("Error creating application:", err)
+			c.JSON(http.StatusConflict, gin.H{"error": "Name already exists or DB error "})
 			return
 		}
 		id, _ := result.LastInsertId()
@@ -85,20 +89,31 @@ func CreateApplication(db *sql.DB) gin.HandlerFunc {
 // ListApplications returns all applications
 func ListApplications(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := db.Query("SELECT id, name, image, env, status, created_at, domain, port, git_url, branch, dockerfile_path, volumes, build_args FROM applications ORDER BY id DESC")
+		rows, err := db.Query("SELECT id, name, image, env, status, created_at, domain, host_port, container_port, git_url, branch, dockerfile_path, volumes, build_args, container_id FROM applications ORDER BY id DESC")
 		if err != nil {
+			log.Println("Error listing applications:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
 			return
 		}
 		defer rows.Close()
+		var containerID sql.NullString
+
 		apps := []models.Application{}
 		for rows.Next() {
 			var app models.Application
 			var volumesStr, buildArgsStr string
-			if err := rows.Scan(&app.ID, &app.Name, &app.Image, &app.Env, &app.Status, &app.CreatedAt, &app.Domain, &app.Port, &app.GitURL, &app.Branch, &app.DockerfilePath, &volumesStr, &buildArgsStr); err != nil {
+			if err := rows.Scan(&app.ID, &app.Name, &app.Image, &app.Env, &app.Status, &app.CreatedAt, &app.Domain, &app.Port, &app.ContainerPort, &app.GitURL, &app.Branch, &app.DockerfilePath, &volumesStr, &buildArgsStr, &containerID); err != nil {
+				log.Println("Error scanning application:", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
 				return
 			}
+
+			if containerID.Valid {
+				app.ContainerID = containerID.String
+			} else {
+				app.ContainerID = ""
+			}
+
 			if volumesStr != "" {
 				_ = json.Unmarshal([]byte(volumesStr), &app.Volumes)
 			}
@@ -107,6 +122,7 @@ func ListApplications(db *sql.DB) gin.HandlerFunc {
 			}
 			apps = append(apps, app)
 		}
+
 		c.JSON(http.StatusOK, apps)
 	}
 }
@@ -121,15 +137,22 @@ func GetApplication(db *sql.DB) gin.HandlerFunc {
 		}
 		var app models.Application
 		var volumesStr, buildArgsStr string
-		err = db.QueryRow("SELECT id, name, image, env, status, created_at, domain, port, git_url, branch, dockerfile_path, volumes, build_args FROM applications WHERE id = ?", id).Scan(
-			&app.ID, &app.Name, &app.Image, &app.Env, &app.Status, &app.CreatedAt, &app.Domain, &app.Port, &app.GitURL, &app.Branch, &app.DockerfilePath, &volumesStr, &buildArgsStr,
+		var containerID sql.NullString
+		err = db.QueryRow("SELECT id, name, image, env, status, created_at, domain, host_port, container_port, git_url, branch, dockerfile_path, volumes, build_args, container_id FROM applications WHERE id = ?", id).Scan(
+			&app.ID, &app.Name, &app.Image, &app.Env, &app.Status, &app.CreatedAt, &app.Domain, &app.Port, &app.ContainerPort, &app.GitURL, &app.Branch, &app.DockerfilePath, &volumesStr, &buildArgsStr, &containerID,
 		)
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 			return
 		} else if err != nil {
+			log.Println("Error getting application:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
 			return
+		}
+		if containerID.Valid {
+			app.ContainerID = containerID.String
+		} else {
+			app.ContainerID = ""
 		}
 		if volumesStr != "" {
 			_ = json.Unmarshal([]byte(volumesStr), &app.Volumes)
@@ -158,10 +181,11 @@ func UpdateApplication(db *sql.DB) gin.HandlerFunc {
 		volumesJSON, _ := json.Marshal(req.Volumes)
 		buildArgsJSON, _ := json.Marshal(req.BuildArgs)
 		_, err = db.Exec(
-			"UPDATE applications SET name = ?, image = ?, env = ?, status = ?, domain = ?, port = ?, git_url = ?, branch = ?, dockerfile_path = ?, volumes = ?, build_args = ? WHERE id = ?",
-			req.Name, req.Image, string(envJSON), req.Status, req.Domain, req.Port, req.GitURL, req.Branch, req.DockerfilePath, string(volumesJSON), string(buildArgsJSON), id,
+			"UPDATE applications SET name = ?, image = ?, env = ?, status = ?, domain = ?, host_port = ?, container_port = ?, git_url = ?, branch = ?, dockerfile_path = ?, volumes = ?, build_args = ? WHERE id = ?",
+			req.Name, req.Image, string(envJSON), req.Status, req.Domain, req.Port, req.ContainerPort, req.GitURL, req.Branch, req.DockerfilePath, string(volumesJSON), string(buildArgsJSON), id,
 		)
 		if err != nil {
+			log.Println("Error updating application:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
 			return
 		}
@@ -179,6 +203,7 @@ func DeleteApplication(db *sql.DB) gin.HandlerFunc {
 		}
 		_, err = db.Exec("DELETE FROM applications WHERE id = ?", id)
 		if err != nil {
+			log.Println("Error deleting application:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
 			return
 		}
@@ -195,15 +220,23 @@ func DeployApplication(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		var app models.Application
-		err = db.QueryRow("SELECT id, name, image, env FROM applications WHERE id = ?", id).Scan(
-			&app.ID, &app.Name, &app.Image, &app.Env,
+		var volumesStr, buildArgsStr string
+		var containerID sql.NullString
+		err = db.QueryRow("SELECT id, name, image, env, host_port, container_port, volumes, build_args, container_id FROM applications WHERE id = ?", id).Scan(
+			&app.ID, &app.Name, &app.Image, &app.Env, &app.Port, &app.ContainerPort, &volumesStr, &buildArgsStr, &containerID,
 		)
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Application not found"})
 			return
 		} else if err != nil {
+			log.Println("Error getting application:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
 			return
+		}
+		if containerID.Valid {
+			app.ContainerID = containerID.String
+		} else {
+			app.ContainerID = ""
 		}
 		// Parse env JSON
 		var envMap map[string]string
@@ -217,25 +250,82 @@ func DeployApplication(db *sql.DB) gin.HandlerFunc {
 		for k, v := range envMap {
 			envs = append(envs, k+"="+v)
 		}
+		// Parse volumes JSON
+		var volumes []string
+		if volumesStr != "" {
+			_ = json.Unmarshal([]byte(volumesStr), &volumes)
+		}
+		// Parse build_args JSON (not used in container run, but available)
+		var buildArgs map[string]string
+		if buildArgsStr != "" {
+			_ = json.Unmarshal([]byte(buildArgsStr), &buildArgs)
+		}
+		// Prepare Docker mounts
+		var mounts []mount.Mount
+		for _, v := range volumes {
+			mounts = append(mounts, mount.Mount{
+				Type:   mount.TypeBind,
+				Source: v,
+				Target: v,
+			})
+		}
+		// Prepare port bindings if ports are specified
+		portBindings := nat.PortMap{}
+		exposedPorts := nat.PortSet{}
+		if app.Port > 0 && app.ContainerPort > 0 {
+			containerPort := nat.Port(strconv.Itoa(app.ContainerPort) + "/tcp")
+			exposedPorts[containerPort] = struct{}{}
+			portBindings[containerPort] = []nat.PortBinding{{
+				HostIP:   "0.0.0.0",
+				HostPort: strconv.Itoa(app.Port),
+			}}
+		} else if app.Port > 0 {
+			// fallback: if only host_port is set, default container_port to 80
+			containerPort := nat.Port("80/tcp")
+			exposedPorts[containerPort] = struct{}{}
+			portBindings[containerPort] = []nat.PortBinding{{
+				HostIP:   "0.0.0.0",
+				HostPort: strconv.Itoa(app.Port),
+			}}
+		}
 		cli, err := dockerutil.NewClient()
 		if err != nil {
+			log.Println("Error creating Docker client:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Docker client error"})
 			return
 		}
 		defer cli.Close()
+
+		// Explicitly pull the image before creating the container
+		pullReader, err := cli.ImagePull(context.Background(), app.Image, types.ImagePullOptions{})
+		if err != nil {
+			log.Println("Error pulling image:", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to pull image: " + err.Error()})
+			return
+		}
+		io.Copy(io.Discard, pullReader)
+		pullReader.Close()
+
 		resp, err := cli.ContainerCreate(
 			context.Background(),
 			&container.Config{
-				Image: app.Image,
-				Env:   envs,
+				Image:        app.Image,
+				Env:          envs,
+				ExposedPorts: exposedPorts,
 			},
-			nil, nil, nil, app.Name,
+			&container.HostConfig{
+				Mounts:       mounts,
+				PortBindings: portBindings,
+			},
+			nil, nil, app.Name,
 		)
 		if err != nil {
+			log.Println("Error creating container:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create container: " + err.Error()})
 			return
 		}
 		if err := cli.ContainerStart(context.Background(), resp.ID, types.ContainerStartOptions{}); err != nil {
+			log.Println("Error starting container:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start container: " + err.Error()})
 			return
 		}

@@ -462,3 +462,36 @@ func TerminalDockerContainer() gin.HandlerFunc {
 		}
 	}
 }
+
+// GetExposedPorts returns all exposed ports for a given image or container
+// Route: GET /api/docker/exposed-ports?image=nginx:latest or ?container_id=abc123
+func GetExposedPorts() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		image := c.Query("image")
+		containerID := c.Query("container_id")
+		cli, err := dockerutil.NewClient()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Docker client error"})
+			return
+		}
+		defer cli.Close()
+
+		var ports []string
+		if containerID != "" {
+			info, err := cli.ContainerInspect(c, containerID)
+			if err == nil {
+				for port := range info.Config.ExposedPorts {
+					ports = append(ports, string(port))
+				}
+			}
+		} else if image != "" {
+			info, _, err := cli.ImageInspectWithRaw(c, image)
+			if err == nil {
+				for port := range info.Config.ExposedPorts {
+					ports = append(ports, string(port))
+				}
+			}
+		}
+		c.JSON(http.StatusOK, gin.H{"ports": ports})
+	}
+}

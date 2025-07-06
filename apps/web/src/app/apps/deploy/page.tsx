@@ -32,6 +32,7 @@ export default function DeployAppPage() {
   const [buildArgs, setBuildArgs] = useState<Record<string, string>>({});
   const [domain, setDomain] = useState('');
   const [port, setPort] = useState<number | ''>('');
+  const [containerPort, setContainerPort] = useState<number | ''>('');
 
   const handleNext = () => {
     if (step === 'method') setStep('details');
@@ -57,7 +58,8 @@ export default function DeployAppPage() {
           volumes,
           build_args: buildArgs,
           domain,
-          port: port === '' ? undefined : Number(port),
+          host_port: port === '' ? undefined : Number(port),
+          container_port: containerPort === '' ? undefined : Number(containerPort),
         });
       } else {
         await deployApplicationFromGit({
@@ -68,7 +70,8 @@ export default function DeployAppPage() {
           volumes,
           build_args: buildArgs,
           domain,
-          port: port === '' ? undefined : Number(port),
+          host_port: port === '' ? undefined : Number(port),
+          container_port: containerPort === '' ? undefined : Number(containerPort),
         });
       }
       setSuccess('Application deployed successfully!');
@@ -218,8 +221,12 @@ export default function DeployAppPage() {
                 <input type="text" className="w-full border border-gray-300 p-3 rounded-lg" value={domain} onChange={e => setDomain(e.target.value)} />
               </div>
               <div>
-                <label className="block font-semibold mb-1 text-gray-800">Port</label>
+                <label className="block font-semibold mb-1 text-gray-800">Host Port</label>
                 <input type="number" className="w-full border border-gray-300 p-3 rounded-lg" value={port} onChange={e => setPort(e.target.value === '' ? '' : Number(e.target.value))} />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1 text-gray-800">Container Port</label>
+                <input type="number" className="w-full border border-gray-300 p-3 rounded-lg" value={containerPort} onChange={e => setContainerPort(e.target.value === '' ? '' : Number(e.target.value))} />
               </div>
               <div className="flex gap-4 mt-8">
                 <button
@@ -253,7 +260,8 @@ export default function DeployAppPage() {
                 <div className="mb-2"><span className="font-semibold">Volumes:</span> {volumes.join(', ')}</div>
                 <div className="mb-2"><span className="font-semibold">Build Args:</span> {Object.entries(buildArgs).map(([k,v])=>`${k}=${v}`).join(', ')}</div>
                 <div className="mb-2"><span className="font-semibold">Domain:</span> {domain}</div>
-                <div className="mb-2"><span className="font-semibold">Port:</span> {port}</div>
+                <div className="mb-2"><span className="font-semibold">Host Port:</span> {port}</div>
+                <div className="mb-2"><span className="font-semibold">Container Port:</span> {containerPort}</div>
               </div>
               {error && <div className="text-red-500 text-sm font-semibold">{error}</div>}
               {success && <div className="text-green-600 text-sm font-semibold">{success}</div>}

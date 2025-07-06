@@ -1,10 +1,11 @@
 "use client";
 import React, { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { getApplicationDetails, getApplicationLogs, deleteApplication, updateApplication } from '@/services/api';
+import { getApplicationDetails, getApplicationLogs, deleteApplication, updateApplication, deployApplication, deployApplicationFromGit, handleExposedPorts } from '@/services/api';
 import EnvVars from '@/components/EnvVars';
 import LogsViewer from '@/components/LogsViewer';
 import { envStringToObj } from '@/components/EnvVars';
+import { FaMagic } from 'react-icons/fa';
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
@@ -28,7 +29,8 @@ type Application = {
   volumes?: string[];
   build_args?: Record<string, string>;
   domain?: string;
-  port?: number;
+  host_port?: number;
+  container_port?: number;
   container_id?: string;
 };
 
@@ -50,6 +52,7 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
   const [editBuildArgs, setEditBuildArgs] = useState<Record<string, string>>({});
   const [editDomain, setEditDomain] = useState('');
   const [editPort, setEditPort] = useState<number | ''>('');
+  const [editContainerPort, setEditContainerPort] = useState<number | ''>('');
   const [editError, setEditError] = useState('');
   const [editSuccess, setEditSuccess] = useState('');
   const [editLoading, setEditLoading] = useState(false);
@@ -57,6 +60,8 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
   const [deployMsg, setDeployMsg] = useState('');
   const [deployGitMsg, setDeployGitMsg] = useState('');
   const [logsError, setLogsError] = useState('');
+  const [exposedPorts, setExposedPorts] = useState<string[]>([]);
+  const [showPortDropdown, setShowPortDropdown] = useState(false);
   const router = useRouter();
 
   const fetchDetails = async () => {
@@ -122,7 +127,8 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
       setEditVolumes(details.volumes || []);
       setEditBuildArgs(details.build_args || {});
       setEditDomain(details.domain || '');
-      setEditPort(details.port ?? '');
+      setEditPort(details.host_port ?? '');
+      setEditContainerPort(details.container_port ?? '');
     }
   }, [details]);
 
@@ -141,7 +147,8 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
         volumes: editVolumes,
         build_args: editBuildArgs,
         domain: editDomain,
-        port: editPort === '' ? undefined : Number(editPort),
+        host_port: editPort === '' ? undefined : Number(editPort),
+        container_port: editContainerPort === '' ? undefined : Number(editContainerPort),
       });
       setEditSuccess('Application updated!');
       fetchDetails();
@@ -158,11 +165,7 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
     setDeploying(true);
     setDeployMsg('');
     try {
-      const res = await fetch(`/api/applications/${id}/deploy`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('gakwaya_auth')}` },
-      });
-      const data = await res.json();
+      const data = await deployApplication({ id });
       setDeployMsg(data.message || 'Deployment started.');
     } catch {
       setDeployMsg('Failed to start deployment.');
@@ -174,11 +177,8 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
     setDeploying(true);
     setDeployGitMsg('');
     try {
-      const res = await fetch(`/api/applications/${id}/deploy-from-git`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('gakwaya_auth')}` },
-      });
-      const data = await res.json();
+      // TODO: Add form data
+      const data = await deployApplicationFromGit({ id });
       setDeployGitMsg(data.message || 'Deployment from Git started.');
     } catch {
       setDeployGitMsg('Failed to start deployment from Git.');
@@ -203,7 +203,8 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
         volumes: details.volumes,
         build_args: details.build_args,
         domain: details.domain,
-        port: details.port,
+        host_port: details.host_port,
+        container_port: details.container_port,
         env,
       });
       setEditSuccess('Environment variables updated!');
@@ -214,6 +215,18 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
     } finally {
       setEditLoading(false);
     }
+  };
+
+  const handleFetchExposedPorts = async () => {
+    setShowPortDropdown(false);
+    setExposedPorts([]);
+    try {
+      const res = await handleExposedPorts({ container_id: details?.container_id, image: details?.image });
+      if (Array.isArray(res.ports)) {
+        setExposedPorts(res.ports);
+        setShowPortDropdown(true);
+      }
+    } catch {}
   };
 
   if (loading) return <div className="p-8">Loading...</div>;
@@ -258,7 +271,8 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
             <div><b>Volumes:</b> {(details.volumes||[]).join(', ')}</div>
             <div><b>Build Args:</b> {details.build_args ? Object.entries(details.build_args).map(([k,v])=>`${k}=${v}`).join(', ') : ''}</div>
             <div><b>Domain:</b> {details.domain}</div>
-            <div><b>Port:</b> {details.port}</div>
+            <div><b>Host Port:</b> {details.host_port}</div>
+            <div><b>Container Port:</b> {details.container_port}</div>
             <div><span className="font-semibold">Created At:</span> {details.created_at ? new Date(details.created_at).toLocaleString() : '-'}</div>
           </div>
         )}
@@ -316,8 +330,26 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
               <input type="text" className="w-full border p-2 rounded" value={editDomain} onChange={e => setEditDomain(e.target.value)} />
             </div>
             <div>
-              <label className="block font-semibold mb-1">Port</label>
+              <label className="block font-semibold mb-1">Host Port</label>
               <input type="number" className="w-full border p-2 rounded" value={editPort} onChange={e => setEditPort(e.target.value === '' ? '' : Number(e.target.value))} />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Container Port</label>
+              <div className="flex items-center gap-2">
+                <input type="number" className="w-full border p-2 rounded" value={editContainerPort} onChange={e => setEditContainerPort(e.target.value === '' ? '' : Number(e.target.value))} />
+                <button type="button" title="Show exposed ports" onClick={handleFetchExposedPorts} className="p-2 bg-blue-100 rounded hover:bg-blue-200"><FaMagic /></button>
+              </div>
+              {showPortDropdown && exposedPorts.length > 0 && (
+                <div className="mt-2">
+                  <label className="block text-xs text-gray-500 mb-1">Select from exposed ports:</label>
+                  <select className="w-full border p-2 rounded" onChange={e => { setEditContainerPort(Number(e.target.value)); setShowPortDropdown(false); }} value={editContainerPort || ''}>
+                    <option value="">-- Select a port --</option>
+                    {exposedPorts.map(port => (
+                      <option key={port} value={parseInt(port)}>{parseInt(port)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             {editError && <div className="text-red-500 text-sm">{editError}</div>}
             {editSuccess && <div className="text-green-600 text-sm">{editSuccess}</div>}

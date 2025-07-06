@@ -22,7 +22,8 @@ func Migrate(db *sql.DB) error {
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		container_id TEXT,
 		domain TEXT,
-		port INTEGER,
+		host_port INTEGER,
+		container_port INTEGER,
 		git_url TEXT,
 		branch TEXT,
 		dockerfile_path TEXT,
@@ -31,5 +32,10 @@ func Migrate(db *sql.DB) error {
 	);
 	`
 	_, err := db.Exec(query)
+	return err
+}
+
+func AddContainerPortColumn(db *sql.DB) error {
+	_, err := db.Exec("ALTER TABLE applications ADD COLUMN container_port INTEGER;")
 	return err
 }
