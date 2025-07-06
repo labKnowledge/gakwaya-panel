@@ -29,6 +29,7 @@ type Application = {
   build_args?: Record<string, string>;
   domain?: string;
   port?: number;
+  container_id?: string;
 };
 
 export default function AppDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -55,18 +56,32 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
   const [deploying, setDeploying] = useState(false);
   const [deployMsg, setDeployMsg] = useState('');
   const [deployGitMsg, setDeployGitMsg] = useState('');
+  const [logsError, setLogsError] = useState('');
   const router = useRouter();
 
   const fetchDetails = async () => {
     setLoading(true);
     setError('');
+    setLogsError('');
     try {
-      const [detailsData, logsData] = await Promise.all([
+      const [detailsData] = await Promise.all([
         getApplicationDetails(id),
-        getApplicationLogs(id),
       ]);
-      setDetails(detailsData.application || detailsData);
-      setLogs(logsData);
+      const appDetails = detailsData.application || detailsData;
+      setDetails(appDetails);
+      if (appDetails.container_id) {
+        getApplicationLogs(appDetails.container_id)
+          .then(logsData => {
+            setLogs(logsData);
+          })
+          .catch(() => {
+            setLogs('');
+            setLogsError('No logs found for this application.');
+          });
+      } else {
+        setLogs('');
+        setLogsError('No container has been created for this application yet.');
+      }
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
       else setError('Failed to load application details');
@@ -337,7 +352,11 @@ export default function AppDetailsPage({ params }: { params: Promise<{ id: strin
         )}
         {tab === 'logs' && (
           <div>
-            <LogsViewer logs={logs} />
+            {logsError ? (
+              <div className="text-red-500">{logsError}</div>
+            ) : (
+              <LogsViewer logs={logs} />
+            )}
           </div>
         )}
         {tab === 'env' && (
